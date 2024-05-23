@@ -81,117 +81,82 @@ if __name__ == "__main__":
         # Convert the processed frame back to BGR for OpenCV display
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-        # Use lm and lmPose for easier reference to landmarks
-        lm = keypoints.pose_landmarks
-        lmPose = mp_pose.PoseLandmark
+        # Check if pose landmarks are detected
+        if keypoints.pose_landmarks:
+            # Reference the pose landmarks and landmark positions
+            lm = keypoints.pose_landmarks.landmark
+            lmPose = mp_pose.PoseLandmark
 
-        # Extract positions of key joints: shoulders, elbows, and hips
-        r_shldr_x = int(lm.landmark[lmPose.RIGHT_SHOULDER].x * w)
-        r_shldr_y = int(lm.landmark[lmPose.RIGHT_SHOULDER].y * h)
-        l_shldr_x = int(lm.landmark[lmPose.LEFT_SHOULDER].x * w)
-        l_shldr_y = int(lm.landmark[lmPose.LEFT_SHOULDER].y * h)
-        r_elbow_x = int(lm.landmark[lmPose.RIGHT_ELBOW].x * w)
-        r_elbow_y = int(lm.landmark[lmPose.RIGHT_ELBOW].y * h)
-        l_elbow_x = int(lm.landmark[lmPose.LEFT_ELBOW].x * w)
-        l_elbow_y = int(lm.landmark[lmPose.LEFT_ELBOW].y * h)
-        r_hip_x = int(lm.landmark[lmPose.RIGHT_HIP].x * w)
-        r_hip_y = int(lm.landmark[lmPose.RIGHT_HIP].y * h)
-        l_hip_x = int(lm.landmark[lmPose.LEFT_HIP].x * w)
-        l_hip_y = int(lm.landmark[lmPose.LEFT_HIP].y * h)
+            # Extract coordinates for key joints: shoulders, elbows, hips
+            r_shldr_x, r_shldr_y = int(lm[lmPose.RIGHT_SHOULDER].x * width), int(lm[lmPose.RIGHT_SHOULDER].y * height)
+            l_shldr_x, l_shldr_y = int(lm[lmPose.LEFT_SHOULDER].x * width), int(lm[lmPose.LEFT_SHOULDER].y * height)
+            r_elbow_x, r_elbow_y = int(lm[lmPose.RIGHT_ELBOW].x * width), int(lm[lmPose.RIGHT_ELBOW].y * height)
+            l_elbow_x, l_elbow_y = int(lm[lmPose.LEFT_ELBOW].x * width), int(lm[lmPose.LEFT_ELBOW].y * height)
+            r_hip_x, r_hip_y = int(lm[lmPose.RIGHT_HIP].x * width), int(lm[lmPose.RIGHT_HIP].y * height)
+            l_hip_x, l_hip_y = int(lm[lmPose.LEFT_HIP].x * width), int(lm[lmPose.LEFT_HIP].y * height)
 
+            # Calculate distances between shoulders and hips, shoulders and elbows
+            r_offset = findDistance(r_shldr_x, r_shldr_y, r_hip_x, r_hip_y)
+            l_offset = findDistance(l_shldr_x, l_shldr_y, l_hip_x, l_hip_y)
+            r_arm_distance = findDistance(r_shldr_x, r_shldr_y, r_elbow_x, r_elbow_y)
+            l_arm_distance = findDistance(l_shldr_x, l_shldr_y, l_elbow_x, l_elbow_y)
 
-        # Calculate distances between various key points
-        r_offset = findDistance(r_shldr_x, r_shldr_y, r_hip_x, r_hip_y)
-        l_offset = findDistance(l_shldr_x, l_shldr_y, l_hip_x, l_hip_y)
-        r_arm_distance = findDistance(r_shldr_x, r_shldr_y, r_elbow_x, r_elbow_y)
-        l_arm_distance = findDistance(l_shldr_x, l_shldr_y, l_elbow_x, l_elbow_y)
+            # Count repetitions based on right arm distance threshold
+            if int(r_arm_distance) == 108:
+                reps += 0.5
+            # Display the repetition count on the frame
+            cv2.putText(image, 'Repetitions: ' + str(int(reps)), (50, 100), font, 1.5, white, 2)
+            # Display hip/shoulder alignment status
+            cv2.putText(image, 'Hip/Shoulder: ', (5, 850), font, 0.9, white, 2)
 
-        # Count repetitions when the distance between shoulder and elbow reaches a threshold
-        "Ideally 108 was selected as a low threshold so everytime the elbow to shoulder distance went to this value" \
-        "it would count half a repetition (one for on the way down the other for coming back up). Unfortunately the camera " \
-        "angle caused some inconsistencies in the arm distance and the repetition did not work as well as anticipated"
-        if int(r_arm_distance) == 108:
-            reps += .5
-        cv2.putText(image, 'Repetitions: ' + str(int(reps)), (50, 100), font, 1.5, white, 2)
+            # Determine alignment status and set the corresponding color
+            if inRange(r_offset, l_offset):
+                alignment_color = green
+                alignment_status = 'Aligned'
+            else:
+                alignment_color = red
+                alignment_status = 'Not Aligned'
 
-        # Display hip/shoulder alignment status
-        cv2.putText(image, 'Hip/Shoulder: ', (5, 850), font, .9, white, 2)
+            # Display alignment status and draw lines between joints
+            cv2.putText(image, alignment_status, (250, 850), font, 0.8, alignment_color, 2)
+            cv2.line(image, (l_shldr_x, l_shldr_y), (r_shldr_x, r_shldr_y), alignment_color, 4)
+            cv2.line(image, (l_hip_x, l_hip_y), (r_hip_x, r_hip_y), alignment_color, 4)
+            cv2.line(image, (l_shldr_x, l_shldr_y), (l_hip_x, l_hip_y), alignment_color, 4)
+            cv2.line(image, (r_shldr_x, r_shldr_y), (r_hip_x, r_hip_y), alignment_color, 4)
 
-        # Check if hips and shoulders are aligned
-        if inRange(r_offset, l_offset):
-            cv2.putText(image, 'Aligned', (250, 850), font, .8, green, 2)
-            cv2.line(image, (l_shldr_x, l_shldr_y), (r_shldr_x, r_shldr_y), green, 4)
-            cv2.line(image, (l_hip_x, l_hip_y), (r_hip_x, r_hip_y), green, 4)
-            cv2.line(image, (l_shldr_x, l_shldr_y), (l_hip_x, l_hip_y), green, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_hip_x, r_hip_y), green, 4)
-        else:
-            cv2.putText(image, 'Not Aligned', (250, 850), font, .8, red, 2)
-            cv2.line(image, (l_shldr_x, l_shldr_y), (r_shldr_x, r_shldr_y), red, 4)
-            cv2.line(image, (l_hip_x, l_hip_y), (r_hip_x, r_hip_y), red, 4)
-            cv2.line(image, (l_shldr_x, l_shldr_y), (l_hip_x, l_hip_y), red, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_hip_x, r_hip_y), red, 4)
+            # Calculate angles for right and left arm
+            r_arm_angle = findAngle(r_shldr_x - r_elbow_x, r_shldr_y - r_elbow_y, 0, 150)
+            l_arm_angle = findAngle(l_shldr_x - l_elbow_x, l_shldr_y - l_elbow_y, 0, 150)
 
-        # Calculate vectors for angle computation
-        r_shldr_vect_x = findVector(r_shldr_x, r_shldr_x)
-        r_shldr_vect_y = findVector(r_shldr_y, r_shldr_y + 150)
-        l_shldr_vect_x = findVector(l_shldr_x, l_shldr_x)
-        l_shldr_vect_y = findVector(l_shldr_y, l_shldr_y + 150)
-        r_elbow_vect_x = findVector(r_shldr_x, r_elbow_x)
-        r_elbow_vect_y = findVector(r_shldr_y, r_elbow_y)
-        l_elbow_vect_x = findVector(l_shldr_x, l_elbow_x)
-        l_elbow_vect_y = findVector(l_shldr_y, l_elbow_y)
+            # Draw circles at the key joint positions
+            cv2.circle(image, (l_shldr_x, l_shldr_y), 7, yellow, -1)
+            cv2.circle(image, (r_shldr_x, r_shldr_y), 7, yellow, -1)
+            cv2.circle(image, (l_elbow_x, l_elbow_y), 7, yellow, -1)
+            cv2.circle(image, (r_elbow_x, r_elbow_y), 7, yellow, -1)
+            cv2.circle(image, (l_hip_x, l_hip_y), 7, yellow, -1)
+            cv2.circle(image, (r_hip_x, r_hip_y), 7, yellow, -1)
+            cv2.circle(image, (l_shldr_x, l_shldr_y - 75), 7, yellow, -1)
+            cv2.circle(image, (r_shldr_x, r_shldr_y - 75), 7, yellow, -1)
+            cv2.circle(image, (l_shldr_x, l_shldr_y + 150), 7, yellow, -1)
+            cv2.circle(image, (r_shldr_x, r_shldr_y + 150), 7, yellow, -1)
 
-        # Calculate angles at the elbows
-        r_arm_angle = findAngle(r_shldr_vect_x, r_shldr_vect_y, r_elbow_vect_x, r_elbow_vect_y)
-        l_arm_angle = findAngle(l_shldr_vect_x, l_shldr_vect_y, l_elbow_vect_x, l_elbow_vect_y)
+            # Display arm angle correctness
+            cv2.putText(image, 'Arm Angle: ', (5, 900), font, 0.9, white, 2)
+            angle_color = green if 35 < r_arm_angle < 55 and 35 < l_arm_angle < 55 else red
+            angle_status = 'Correct' if angle_color == green else 'Incorrect'
 
-        # Draw landmarks on the image
-        cv2.circle(image, (l_shldr_x, l_shldr_y), 7, yellow, -1)
-        cv2.circle(image, (r_shldr_x, r_shldr_y), 7, yellow, -1)
-        cv2.circle(image, (l_elbow_x, l_elbow_y), 7, yellow, -1)
-        cv2.circle(image, (r_elbow_x, r_elbow_y), 7, yellow, -1)
-        cv2.circle(image, (l_hip_x, l_hip_y), 7, yellow, -1)
-        cv2.circle(image, (r_hip_x, r_hip_y), 7, yellow, -1)
-        # parallel line through shoulder to display where angle is measured from
-        cv2.circle(image, (l_shldr_x, l_shldr_y - 75), 7, yellow, -1)
-        cv2.circle(image, (r_shldr_x, r_shldr_y - 75), 7, yellow, -1)
-        cv2.circle(image, (l_shldr_x, l_shldr_y + 150), 7, yellow, -1)
-        cv2.circle(image, (r_shldr_x, r_shldr_y + 150), 7, yellow, -1)
+            # Display angle correctness and draw angle values near the elbows
+            cv2.putText(image, angle_status, (250, 900), font, 0.9, angle_color, 2)
+            cv2.putText(image, f'{int(r_arm_angle)}{chr(176)}', (r_elbow_x - 20, r_elbow_y + 30), font, 0.8, angle_color, 1)
+            cv2.putText(image, f'{int(l_arm_angle)}{chr(176)}', (l_elbow_x - 10, l_elbow_y + 30), font, 0.8, angle_color, 1)
 
-
-        # Display feedback on arm angle correctness
-        cv2.putText(image, 'Arm Angle: ', (5, 900), font, .9, white, 2)
-        degree_sign = u"\N{DEGREE SIGN}"
-
-        # Determine if arms within proper position
-        # These values were picked to ensure the elbow is approximately 45 degrees from the shoulder
-        if 35 < r_arm_angle < 55  and 35 < l_arm_angle < 55:
-            cv2.putText(image, 'Correct', (250, 900), font, .9, green, 2)
-            cv2.putText(image, str(int(r_arm_angle)) + '*', (r_elbow_x - 20, r_elbow_y + 30), font, 0.8, green, 1)
-            cv2.putText(image, str(int(l_arm_angle)) + '*', (l_elbow_x - 10, l_elbow_y + 30), font, 0.8, green, 1)
-
-
-            # Connect landmarks
+            # Draw lines to represent arm angles
             cv2.line(image, (l_shldr_x, l_shldr_y), (l_shldr_x, l_shldr_y + 150), blue, 4)
             cv2.line(image, (l_shldr_x, l_shldr_y), (l_shldr_x, l_shldr_y - 75), blue, 4)
-            cv2.line(image, (l_shldr_x, l_shldr_y), (l_elbow_x, l_elbow_y), green, 4)
+            cv2.line(image, (l_shldr_x, l_shldr_y), (l_elbow_x, l_elbow_y), angle_color, 4)
             cv2.line(image, (r_shldr_x, r_shldr_y), (r_shldr_x, r_shldr_y + 150), blue, 4)
             cv2.line(image, (r_shldr_x, r_shldr_y), (r_shldr_x, r_shldr_y - 75), blue, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_elbow_x, r_elbow_y), green, 4)
-
-        else:
-            cv2.putText(image, 'Incorrect', (250, 900), font, 0.9, red, 2)
-            cv2.putText(image, str(int(r_arm_angle)) + '*', (r_elbow_x - 20, r_elbow_y + 30), font, 0.8, red, 1)
-            cv2.putText(image, str(int(l_arm_angle)) + '*', (l_elbow_x - 10, l_elbow_y + 30), font, 0.8, red, 1)
-
-            # Connect landmarks
-            cv2.line(image, (l_shldr_x, l_shldr_y), (l_shldr_x, l_shldr_y + 150), blue, 4)
-            cv2.line(image, (l_shldr_x, l_shldr_y), (l_shldr_x, l_shldr_y - 75), blue, 4)
-            cv2.line(image, (l_shldr_x, l_shldr_y), (l_elbow_x, l_elbow_y), red, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_shldr_x, r_shldr_y + 150), blue, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_shldr_x, r_shldr_y - 75), blue, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_elbow_x, r_elbow_y), red, 4)
-
+            cv2.line(image, (r_shldr_x, r_shldr_y), (r_elbow_x, r_elbow_y), angle_color, 4)
 
         # Write annotated frame to output video
         video_output.write(image)
