@@ -48,6 +48,7 @@ This project is a Python script that uses OpenCV and MediaPipe to process a vide
 
 https://github.com/jtnicastro/PushUp_Posture_Checker/assets/78828629/163f2bb6-cc91-4914-b0b5-a5bca9626161
 
+Note: if sample output video is not playing, you can still view it by opening the file **'output.mp4'** in this repository
 
 ## Contributing
 
